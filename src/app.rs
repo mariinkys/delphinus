@@ -50,7 +50,7 @@ pub fn App() -> impl IntoView {
         </Router>
 
         <footer class="w-full p-4 gap-2 flex sm:flex-row flex-col bg-base-200 text-base-content">
-            <aside class="flex-grow sm:text-left text-center">
+            <aside class="grow sm:text-left text-center">
                 <p>"Made by Alex Marín - FLOSS, now and always! - "<a class="link-primary" href="https://github.com/mariinkys/delphinus/releases" target="_blank">"v"{env!("CARGO_PKG_VERSION")}</a></p>
             </aside>
             <nav class="flex gap-3 text-center justify-center">
