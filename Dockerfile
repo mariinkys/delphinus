@@ -1,14 +1,14 @@
-FROM rustlang/rust:nightly-bookworm as builder
+FROM ubuntu:24.04 as builder
 
-RUN wget https://github.com/cargo-bins/cargo-binstall/releases/latest/download/cargo-binstall-x86_64-unknown-linux-musl.tgz \
- && tar -xvf cargo-binstall-x86_64-unknown-linux-musl.tgz \
- && cp cargo-binstall /usr/local/cargo/bin \
- && rm cargo-binstall-x86_64-unknown-linux-musl.tgz
+RUN apt-get update && \
+    apt-get install -y --no-install-recommends \
+    curl build-essential npm cmake git ca-certificates pkg-config libssl-dev wget && \
+    apt-get clean && \
+    rm -rf /var/lib/apt/lists/*
 
-RUN apt-get update -y \
- && apt-get install -y --no-install-recommends clang libssl-dev pkg-config npm binaryen build-essential \
- && apt-get clean -y \
- && rm -rf /var/lib/apt/lists/*
+# Install Rust
+RUN curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y --default-toolchain nightly
+ENV PATH="/root/.cargo/bin:${PATH}"
 
 # Download latest Binaryen release from GitHub and install it
 RUN BINARYEN_VERSION=$(curl -s https://api.github.com/repos/WebAssembly/binaryen/releases/latest | grep '"tag_name":' | sed -E 's/.*"([^"]+)".*/\1/') \
@@ -17,18 +17,20 @@ RUN BINARYEN_VERSION=$(curl -s https://api.github.com/repos/WebAssembly/binaryen
  && cp -r binaryen-${BINARYEN_VERSION}/bin/* /usr/local/bin/ \
  && rm -rf binaryen-${BINARYEN_VERSION} binaryen-${BINARYEN_VERSION}-x86_64-linux.tar.gz
 
-RUN cargo binstall cargo-leptos -y
+RUN npm install -g sass
+
+RUN curl --proto '=https' --tlsv1.3 -LsSf https://github.com/leptos-rs/cargo-leptos/releases/latest/download/cargo-leptos-installer.sh | sh
+
 RUN rustup target add wasm32-unknown-unknown
 
 WORKDIR /work
 COPY . .
 
-RUN npm install -g sass \
- && npm install
+RUN npm install
 
 RUN RUSTFLAGS="--cfg erase_components" cargo leptos build --release -vv
 
-FROM debian:bookworm-slim as runner
+FROM ubuntu:24.04 as runner
 
 WORKDIR /app
 
@@ -41,10 +43,8 @@ RUN apt-get update -y \
 COPY --from=builder /work/target/release/delphinus /app/
 COPY --from=builder /work/target/site /app/site
 COPY --from=builder /work/Cargo.toml /app/
-# Copy the dictionaries
 COPY --from=builder /work/dictionaries /app/dictionaries
 
-# Download OCR models and place them under /app/ocr_models
 RUN mkdir -p /app/ocr_models && \
  curl -L -o /app/ocr_models/ppocrv5_mobile_det.onnx \
  https://github.com/GreatV/oar-ocr/releases/download/v0.1.0/ppocrv5_mobile_det.onnx && \
@@ -59,5 +59,4 @@ ENV LEPTOS_SITE_ROOT=./site
 ENV DISABLE_ORC="FALSE"
 
 EXPOSE 8080
-
 CMD ["/app/delphinus"]
