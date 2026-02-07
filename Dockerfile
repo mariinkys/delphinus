@@ -1,4 +1,4 @@
-FROM rustlang/rust:nightly-bookworm as builder
+FROM rustlang/rust:nightly-trixie as builder
 
 RUN wget https://github.com/cargo-bins/cargo-binstall/releases/latest/download/cargo-binstall-x86_64-unknown-linux-musl.tgz \
  && tar -xvf cargo-binstall-x86_64-unknown-linux-musl.tgz \
@@ -28,7 +28,7 @@ RUN npm install -g sass \
 
 RUN RUSTFLAGS="--cfg erase_components" cargo leptos build --release -vv
 
-FROM debian:bookworm-slim as runner
+FROM debian:trixie-slim as runner
 
 WORKDIR /app
 
