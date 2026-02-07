@@ -67,7 +67,7 @@ pub fn NavbarComponent() -> impl IntoView {
                 <a class="btn btn-primary hidden sm:flex" href="/faq">"FAQ"</a>
             </div>
         </div>
-    }
+    }.into_any()
 }
 
 #[cfg(target_arch = "wasm32")]

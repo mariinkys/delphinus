@@ -40,7 +40,7 @@ pub fn ModifyGeneratedFlashcards(flashcards: Vec<Flashcard>) -> impl IntoView {
                                     child.front.set(event_target_value(&ev));
                                 }/>
                             </label>
-                            <label class="input flex items-center gap-2 font-bold flex-grow w-full">
+                            <label class="input flex items-center gap-2 font-bold grow w-full">
                                 "Back"
                                 <input type="text" class="grow font-normal" name="back" id="back" value=child.back on:input=move |ev| {
                                     child.back.set(event_target_value(&ev));
