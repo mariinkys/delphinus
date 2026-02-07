@@ -228,5 +228,5 @@ pub fn GeneratorPage() -> impl IntoView {
             </div>
         </Show>
 
-    }.into_any()
+    }
 }
