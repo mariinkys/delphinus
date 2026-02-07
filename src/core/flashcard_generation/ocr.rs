@@ -9,7 +9,7 @@ pub async fn ocr_image(bytes: Vec<u8>, separation_char: String) -> Result<String
 
     let oarocr: Data<Arc<OAROCR>> = extract().await?;
     let image = oar_ocr::utils::image::load_image_from_memory(&bytes)?;
-    let results = oarocr.predict(&[image])?;
+    let results = oarocr.predict(vec![image])?;
     let result = &results[0];
 
     let mut clean_result = Vec::new();
