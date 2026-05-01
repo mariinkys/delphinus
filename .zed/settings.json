@@ -1,0 +1,24 @@
+{
+  "lsp": {
+    "rust-analyzer": {
+      "initialization_options": {
+        "check": {
+          "command": "clippy",
+        },
+        "cargo": {
+          "features": ["ssr"],
+        },
+        "notifications": {
+          "unindexedProject": false,
+        },
+      },
+    },
+    "tailwindcss-language-server": {
+      "settings": {
+        "includeLanguages": {
+          "rust": "html",
+        },
+      },
+    },
+  },
+}
