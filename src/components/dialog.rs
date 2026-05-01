@@ -47,11 +47,7 @@ pub fn DialogComponent(
         dialog_title
     };
 
-    let close_btn_disabled = if let Some(state) = is_close_btn_disabled {
-        state
-    } else {
-        false
-    };
+    let close_btn_disabled = is_close_btn_disabled.unwrap_or_default();
 
     view! {
         <Show when=move || dialog_node_ref.is_none()>

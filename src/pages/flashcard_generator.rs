@@ -30,7 +30,7 @@ pub fn GeneratorPage() -> impl IntoView {
         set_loading(true);
 
         //Check data
-        if character_string.read().len() > 0 {
+        if !character_string.read().is_empty() {
             let is_ch = language.read() == String::from("Chinese");
             spawn_local(async move {
                 let clean_input = remove_whitespace(&character_string.get_untracked());

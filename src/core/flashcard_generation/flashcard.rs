@@ -124,7 +124,7 @@ pub async fn search_dictionary(
     Ok(flashcards)
 }
 
-pub fn create_vaia_import_string(flashcards: &Vec<Flashcard>) -> String {
+pub fn create_vaia_import_string(flashcards: &[Flashcard]) -> String {
     let mut result = String::new();
 
     for (i, entry) in flashcards.iter().enumerate() {
@@ -138,30 +138,30 @@ pub fn create_vaia_import_string(flashcards: &Vec<Flashcard>) -> String {
     result
 }
 
-pub fn create_quizlet_import_string(flashcards: &Vec<Flashcard>) -> String {
+pub fn create_quizlet_import_string(flashcards: &[Flashcard]) -> String {
     let mut result = String::new();
 
     for (i, entry) in flashcards.iter().enumerate() {
         result = result + &entry.front.get_untracked() + "\t" + &entry.back.get_untracked();
 
         if i + 1 != flashcards.len() {
-            result.push_str("\n");
+            result.push('\n');
         }
     }
 
     result
 }
 
-pub fn create_anki_hex_file(flashcards: &Vec<Flashcard>) -> String {
+pub fn create_anki_hex_file(flashcards: &[Flashcard]) -> String {
     let mut result = String::new();
-    result = result + "#separator:tab\n";
-    result = result + "#html:false\n";
+    result += "#separator:tab\n";
+    result += "#html:false\n";
 
     for (i, entry) in flashcards.iter().enumerate() {
         result = result + &entry.front.get_untracked() + "\t" + &entry.back.get_untracked();
 
         if i + 1 != flashcards.len() {
-            result.push_str("\n");
+            result.push('\n');
         }
     }
 

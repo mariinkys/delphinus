@@ -30,7 +30,7 @@ pub fn ModifyGeneratedFlashcards(flashcards: Vec<Flashcard>) -> impl IntoView {
                 <div class="text-center m-auto p-2 max-w-7xl">
                     <For
                         each=data
-                        key=|state| (state.id.clone(), state.id)
+                        key=|state| (state.id, state.id)
                         let:child
                     >
                         <div class="flex flex-col sm:flex-row gap-2 p-2 border border-primary rounded-lg my-2 shadow-lg">

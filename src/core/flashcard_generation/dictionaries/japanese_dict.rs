@@ -111,6 +111,7 @@ impl JapaneseDictionary {
             return None;
         }
 
+        #[allow(clippy::collapsible_if)]
         if let Some(start_bracket) = trimmed_line.find('[') {
             if let Some(end_bracket) = trimmed_line.find(']') {
                 let hanzi_part = &trimmed_line[..start_bracket].trim();

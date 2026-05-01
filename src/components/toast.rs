@@ -29,7 +29,7 @@ pub fn ToastComponent() -> impl IntoView {
         "toast toast-top toast-center transition-opacity duration-500 ease-in-out z-100";
     let toast_parent_classes = move || -> String {
         let t = toast.read();
-        let opacity_class = if t.visible == true {
+        let opacity_class = if t.visible {
             "opacity-100 visible".to_string()
         } else {
             "opacity-0 invisible".to_string()
@@ -45,7 +45,7 @@ pub fn ToastComponent() -> impl IntoView {
             ToastType::Error => "alert alert-error",
         };
 
-        format!("{}", background_class)
+        background_class.to_string()
     };
 
     Effect::new(move |_| {

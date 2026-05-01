@@ -104,7 +104,7 @@ pub fn ImportGeneratedFlashcards() -> impl IntoView {
         <div class="text-center m-auto p-2 max-w-7xl">
             <div class="card bg-base-100 shadow-xl w-full text-left">
                 <div class="card-body">
-                    <h2 class="card-title">"Import to Anki (Experimental Support)"</h2>
+                    <h2 class="card-title">"Import to Anki"</h2>
                     <ol class="px-4 list-decimal">
                         <li>"Download the generated Anki File"</li>
                         <li>"Use the Anki File to import your flashcards!"</li>
