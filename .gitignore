@@ -1,4 +1,5 @@
 /target
+/dictionaries/cedict*
 /dictionaries/JMdict*
 /ocr_models/*.onnx
 /ocr_models/*.txt
