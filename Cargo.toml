@@ -1,122 +1,66 @@
 [package]
 name = "delphinus"
-version = "0.7.2"
+version = "1.0.0"
 edition = "2024"
 
 [lib]
 crate-type = ["cdylib", "rlib"]
 
 [dependencies]
-actix-files = { version = "0.6.10", optional = true }
-actix-web = { version = "4.13.0", optional = true, features = ["macros"] }
+leptos = "0.8.23"
+leptos_router = "0.8.17"
+leptos_meta = "0.8.7"
+leptos_axum = { version = "0.8.10", optional = true }
+axum = { version = "0.8.9", optional = true, default-features = false, features = ["http1", "tokio", "query", "json"] }
+tokio = { version = "1.54", optional = true, features = ["rt-multi-thread", "macros", "net", "signal", "time", "sync"] }
+memmap2 = { version = "0.9.12", optional = true }
+memchr = { version = "2.7", optional = true }
+oar-ocr = { version = "0.10.2", optional = true, default-features = false, features = ["simd"] }
+image = { version = "0.25.10", optional = true, default-features = false, features = ["jpeg", "png", "webp"] }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+wasm-bindgen = "0.2.130"
+wasm-bindgen-futures = "0.4"
+js-sys = "0.3"
 console_error_panic_hook = "0.1.7"
-http = { version = "1.4.0", optional = true }
-leptos = { version = "0.8.19", features = ["nightly"] }
-leptos_meta = { version = "0.8.6" }
-leptos_actix = { version = "0.8.7", optional = true }
-leptos_router = { version = "0.8.13", features = ["nightly"] }
-wasm-bindgen = "=0.2.120"
-
-# Added by me
-serde = { version = "1.0.228" }
-oar-ocr = { version = "0.6.3", optional = true }
-wasm-bindgen-futures = "0.4.70"                   #needed for file upload
-memmap2 = { version = "0.9.10", optional = true }
+web-sys = { version = "0.3", features = ["Blob", "BlobPropertyBag", "Clipboard", "DataTransfer", "DataTransferItem", "DataTransferItemList", "Document", "DragEvent", "Element", "File", "FileList", "HtmlAnchorElement", "HtmlCanvasElement", "HtmlDialogElement", "HtmlElement", "CssStyleDeclaration", "HtmlInputElement", "HtmlTextAreaElement", "InputEvent", "CompositionEvent", "ImageBitmap", "CanvasRenderingContext2d", "Navigator", "Request", "RequestInit", "Response", "Storage", "Url", "Window", "ClipboardEvent", "KeyboardEvent", "MediaQueryList", "OffscreenCanvas", "OffscreenCanvasRenderingContext2d", "ImageEncodeOptions", "Headers"] }
 
 [features]
-csr = ["leptos/csr"]
 hydrate = ["leptos/hydrate"]
 ssr = [
-  "dep:actix-files",
-  "dep:actix-web",
-  "dep:leptos_actix",
-  "leptos/ssr",
-  "leptos_meta/ssr",
-  "leptos_router/ssr",
-
-  "dep:memmap2",
-  "dep:oar-ocr",
+  "dep:leptos_axum", "dep:axum", "dep:tokio", "dep:memmap2", "dep:memchr",
+  "leptos/ssr", "leptos_meta/ssr", "leptos_router/ssr",
 ]
+# OCR with an ONNX Runtime you provide (ORT_LIB_PATH + ORT_PREFER_DYNAMIC_LINK=1)
+ocr = ["ssr", "dep:oar-ocr", "dep:image"]
+# OCR with ONNX Runtime downloaded and linked statically at build time (Docker)
+ocr-bundled = ["ocr", "oar-ocr/download-binaries"]
 
-# Defines a size-optimized profile for the WASM bundle in release mode
+[profile.release]
+opt-level = 3
+lto = "fat"
+codegen-units = 1
+strip = true
+
+# Size-optimised profile for the WASM bundle
 [profile.wasm-release]
 inherits = "release"
-opt-level = 'z'
-lto = true
-codegen-units = 1
+opt-level = "z"
 panic = "abort"
 
-# https://github.com/leptos-rs/leptos/discussions/2399 (As of web-sys v0.3.70, the clipboard API is now stable, so no need for RUSTFLAGS)
-[dependencies.web-sys]
-version = "0.3.97"
-features = [
-  "Clipboard",
-  "Navigator",
-  "Window",
-  "MediaQueryList",
-  "Storage",
-  "File",
-  "FileList",
-]
-
 [package.metadata.leptos]
-# The name used by wasm-bindgen/cargo-leptos for the JS/WASM bundle. Defaults to the crate name
 output-name = "delphinus"
-# The site root folder is where cargo-leptos generate all output. WARNING: all content of this folder will be erased on a rebuild. Use it in your server setup.
 site-root = "target/site"
-# The site-root relative folder where all compiled output (JS, WASM and CSS) is written
-# Defaults to pkg
 site-pkg-dir = "pkg"
-# The tailwind input file.
-#
-# Optional, Activates the tailwind build
-tailwind-input-file = "style/tailwind.css"
-
-# The tailwind config file.
-#
-# Optional, defaults to "tailwind.config.js" which if is not present
-# is generated for you
-tailwind-config-file = "tailwind.config.js"
-
-# Assets source dir. All files found here will be copied and synchronized to site-root.
-# The assets-dir cannot have a sub directory with the same name/path as site-pkg-dir.
-#
-# Optional. Env: LEPTOS_ASSETS_DIR.
+style-file = "style/main.css"
 assets-dir = "assets"
-# The IP and port (ex: 127.0.0.1:3000) where the server serves the content. Use it in your server setup.
 site-addr = "127.0.0.1:3000"
-# The port to use for automatic reload monitoring
 reload-port = 3001
-# [Optional] Command to use when running end2end tests. It will run in the end2end dir.
-#   [Windows] for non-WSL use "npx.cmd playwright test"
-#   This binary name can be checked in Powershell with Get-Command npx
-end2end-cmd = "npx playwright test"
-end2end-dir = "end2end"
-#  The browserlist query used for optimizing the CSS.
 browserquery = "defaults"
-# The environment Leptos will run in, usually either "DEV" or "PROD"
 env = "DEV"
-# The features to use when compiling the bin target
-#
-# Optional. Can be over-ridden with the command line parameter --bin-features
 bin-features = ["ssr"]
-
-# If the --no-default-features flag should be used when compiling the bin target
-#
-# Optional. Defaults to false.
 bin-default-features = false
-
-# The features to use when compiling the lib target
-#
-# Optional. Can be over-ridden with the command line parameter --lib-features
 lib-features = ["hydrate"]
-
-# If the --no-default-features flag should be used when compiling the lib target
-#
-# Optional. Defaults to false.
 lib-default-features = false
-
-# The profile to use for the lib target when compiling for release
-#
-# Optional. Defaults to "release".
 lib-profile-release = "wasm-release"
+hash-files = false

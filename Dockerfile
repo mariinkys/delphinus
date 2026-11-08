@@ -1,63 +1,76 @@
-FROM rustlang/rust:nightly-trixie as builder
+#
+# AI HAS BEEN USED TO GENERATE THIS DOCKERFILE, I STRUGGLE WITH DOCKER
+#
 
-RUN wget https://github.com/cargo-bins/cargo-binstall/releases/latest/download/cargo-binstall-x86_64-unknown-linux-musl.tgz \
- && tar -xvf cargo-binstall-x86_64-unknown-linux-musl.tgz \
- && cp cargo-binstall /usr/local/cargo/bin \
- && rm cargo-binstall-x86_64-unknown-linux-musl.tgz
+# ---------------------------------------------------------------- build
+FROM rust:1-trixie AS builder
 
 RUN apt-get update -y \
- && apt-get install -y --no-install-recommends clang libssl-dev pkg-config npm binaryen build-essential \
- && apt-get clean -y \
- && rm -rf /var/lib/apt/lists/*
-
-# Download latest Binaryen release from GitHub and install it
-RUN BINARYEN_VERSION=$(curl -s https://api.github.com/repos/WebAssembly/binaryen/releases/latest | grep '"tag_name":' | sed -E 's/.*"([^"]+)".*/\1/') \
- && wget https://github.com/WebAssembly/binaryen/releases/download/${BINARYEN_VERSION}/binaryen-${BINARYEN_VERSION}-x86_64-linux.tar.gz \
- && tar -xzf binaryen-${BINARYEN_VERSION}-x86_64-linux.tar.gz \
- && cp -r binaryen-${BINARYEN_VERSION}/bin/* /usr/local/bin/ \
- && rm -rf binaryen-${BINARYEN_VERSION} binaryen-${BINARYEN_VERSION}-x86_64-linux.tar.gz
-
-RUN cargo binstall cargo-leptos -y
-RUN rustup target add wasm32-unknown-unknown
+ && apt-get install -y --no-install-recommends brotli \
+ && rm -rf /var/lib/apt/lists/* \
+ && rustup target add wasm32-unknown-unknown \
+ && curl -L --proto '=https' --tlsv1.2 -sSf https://raw.githubusercontent.com/cargo-bins/cargo-binstall/main/install-from-binstall-release.sh | bash \
+ && cargo binstall -y cargo-leptos
 
 WORKDIR /work
 COPY . .
 
-RUN npm install -g sass \
- && npm install
+# `ocr-bundled` links ONNX Runtime statically; use `--bin-features ssr` for a
+# build without image scanning.
+ARG FEATURES=ocr-bundled
+RUN LEPTOS_HASH_FILES=true cargo leptos build --release --bin-features "$FEATURES" \
+ && find target/site -type f \( -name '*.js' -o -name '*.wasm' -o -name '*.css' -o -name '*.webmanifest' \) \
+      -exec brotli -kq 11 {} \; -exec gzip -k9 {} \;
 
-RUN RUSTFLAGS="--cfg erase_components" cargo leptos build --release -vv
+# ------------------------------------------------------- dictionary data
+# The original, unmodified distribution files. Rebuild the image to update them.
+FROM debian:trixie-slim AS data
+RUN apt-get update -y \
+ && apt-get install -y --no-install-recommends curl ca-certificates \
+ && rm -rf /var/lib/apt/lists/*
+WORKDIR /data
+# The OCR models are pinned to a release, so this layer can stay cached.
+RUN mkdir ocr_models \
+ && for f in pp-ocrv5_mobile_det.onnx pp-ocrv5_mobile_rec.onnx ppocrv5_dict.txt; do \
+      curl -fsSL -o "ocr_models/$f" "https://github.com/GreatV/oar-ocr/releases/download/v0.3.0/$f"; \
+    done
+# The dictionaries are updated upstream all the time. Pass a new value (the CI
+# workflow uses its run id) to download them again while every other layer,
+# including the slow Rust build, still comes from the cache.
+ARG DATA_VERSION=unset
+RUN echo "dictionary data: $DATA_VERSION" \
+ && curl -fsSL http://ftp.edrdg.org/pub/Nihongo/JMdict_e.gz | gunzip > JMdict_e \
+ && curl -fsSL https://www.mdbg.net/chinese/export/cedict/cedict_1_0_ts_utf-8_mdbg.txt.gz | gunzip > cedict_ts.u8 \
+ && grep -q '<JMdict>' JMdict_e \
+ && grep -q '^[^#].* \[.*\] /' cedict_ts.u8
 
-FROM debian:trixie-slim as runner
-
-WORKDIR /app
+# ------------------------------------------------------------------ run
+FROM debian:trixie-slim
 
 RUN apt-get update -y \
- && apt-get install -y --no-install-recommends openssl ca-certificates curl \
- && apt-get autoremove -y \
- && apt-get clean -y \
- && rm -rf /var/lib/apt/lists/*
+ && apt-get install -y --no-install-recommends ca-certificates \
+ && rm -rf /var/lib/apt/lists/* \
+ && useradd --system --uid 10001 delphinus
 
-COPY --from=builder /work/target/release/delphinus /app/
+WORKDIR /app
+COPY --from=builder /work/target/release/delphinus /work/target/release/hash.txt /app/
 COPY --from=builder /work/target/site /app/site
-COPY --from=builder /work/Cargo.toml /app/
-# Copy the dictionaries
-COPY --from=builder /work/dictionaries /app/dictionaries
+COPY --from=data /data/JMdict_e /data/cedict_ts.u8 /app/dictionaries/
+COPY --from=data /data/ocr_models /app/ocr_models
 
-# Download OCR models and place them under /app/ocr_models
-RUN mkdir -p /app/ocr_models && \
- curl -L -o /app/ocr_models/ppocrv5_mobile_det.onnx \
- https://github.com/GreatV/oar-ocr/releases/download/v0.1.0/ppocrv5_mobile_det.onnx && \
- curl -L -o /app/ocr_models/ppocrv5_mobile_rec.onnx \
- https://github.com/GreatV/oar-ocr/releases/download/v0.1.0/ppocrv5_mobile_rec.onnx && \
- curl -L -o /app/ocr_models/ppocrv5_dict.txt \
- https://github.com/GreatV/oar-ocr/releases/download/v0.1.0/ppocrv5_dict.txt
+ENV LEPTOS_OUTPUT_NAME=delphinus \
+    LEPTOS_SITE_ROOT=site \
+    LEPTOS_SITE_PKG_DIR=pkg \
+    LEPTOS_HASH_FILES=true \
+    LEPTOS_ENV=PROD \
+    LEPTOS_SITE_ADDR=0.0.0.0:8080 \
+    DELPHINUS_THREADS=2 \
+    DELPHINUS_OCR_IDLE_SECS=300 \
+    DISABLE_OCR=false \
+    # Fewer glibc malloc arenas: less memory held per thread.
+    MALLOC_ARENA_MAX=2
 
-ENV RUST_LOG="info"
-ENV LEPTOS_SITE_ADDR="0.0.0.0:8080"
-ENV LEPTOS_SITE_ROOT=./site
-ENV DISABLE_ORC="FALSE"
-
+USER delphinus
 EXPOSE 8080
-
+HEALTHCHECK --interval=60s --timeout=3s CMD ["/bin/bash", "-c", "exec 3<>/dev/tcp/127.0.0.1/8080 && printf 'GET /healthz HTTP/1.0\\r\\n\\r\\n' >&3 && grep -q ok <&3"]
 CMD ["/app/delphinus"]

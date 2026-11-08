@@ -5,9 +5,6 @@
         "check": {
           "command": "clippy",
         },
-        "cargo": {
-          "features": ["ssr"],
-        },
         "notifications": {
           "unindexedProject": false,
         },

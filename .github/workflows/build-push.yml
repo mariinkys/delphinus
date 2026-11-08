@@ -1,0 +1,81 @@
+# Builds the Docker image and pushes it to the GitHub Container Registry (ghcr.io)
+# on every push to main, when a release is published, and on demand from the Actions tab.
+
+name: Build and Push Docker Image
+
+on:
+  push:
+    branches:
+      - main
+  release:
+    types: [published]
+  workflow_dispatch:
+
+# A newer push to the same branch cancels an older build still running.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  REGISTRY: ghcr.io
+  # ghcr.io/<owner>/<repo>, lowercased by the metadata action
+  IMAGE_NAME: ${{ github.repository }}
+
+jobs:
+  build-and-push:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    permissions:
+      contents: read
+      packages: write
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v7
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v4
+
+      - name: Log in to GitHub Container Registry
+        uses: docker/login-action@v4
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Extract metadata (tags, labels) for Docker
+        id: meta
+        uses: docker/metadata-action@v6
+        with:
+          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
+          tags: |
+            # Releases: the release tag (v1.2.3) plus 1.2.3 and 1.2
+            type=ref,event=tag
+            type=semver,pattern={{version}}
+            type=semver,pattern={{major}}.{{minor}}
+            # main (pushes, weekly rebuilds, manual runs): latest
+            type=raw,value=latest,enable={{is_default_branch}}
+            # Every build is also pinned by commit
+            type=sha,format=short
+
+      - name: Build and push Docker image
+        uses: docker/build-push-action@v7
+        with:
+          context: .
+          platforms: linux/amd64
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          build-args: |
+            FEATURES=ocr-bundled
+            DATA_VERSION=${{ github.run_id }}
+          # The Rust/WASM build layers are cached between runs. The dictionary
+          # download is not (DATA_VERSION changes every run), so each image
+          # gets the latest JMdict and CC-CEDICT.
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Display pushed tags
+        run: |
+          echo "Successfully pushed image with tags:"
+          echo "${{ steps.meta.outputs.tags }}"
