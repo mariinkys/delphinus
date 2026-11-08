@@ -1,19 +1,71 @@
 {
-   "name": "Delphinus",
-   "short_name": "Delphinus",
-   "icons": [
-      {
-         "src": "/android-chrome-192x192.png",
-         "sizes": "192x192",
-         "type": "image/png"
-      },
-      {
-         "src": "/android-chrome-512x512.png",
-         "sizes": "512x512",
-         "type": "image/png"
-      }
-   ],
-   "theme_color": "#e9efe9",
-   "background_color": "#e9efe9",
-   "display": "standalone"
+  "id": "/",
+  "name": "Delphinus Flashcards",
+  "short_name": "Delphinus",
+  "description": "Turn a list of Chinese or Japanese words into flashcards for Anki, Quizlet or Vaia, with readings and meanings from CC-CEDICT and JMdict.",
+  "lang": "en",
+  "dir": "ltr",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "display_override": ["standalone", "minimal-ui"],
+  "orientation": "any",
+  "theme_color": "#e9efe9",
+  "background_color": "#e9efe9",
+  "categories": ["education", "productivity"],
+  "prefer_related_applications": false,
+  "launch_handler": {
+    "client_mode": ["focus-existing", "auto"]
+  },
+  "icons": [
+    {
+      "src": "/android-chrome-192x192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/android-chrome-512x512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/maskable-192x192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "maskable"
+    },
+    {
+      "src": "/maskable-512x512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
+    }
+  ],
+  "screenshots": [
+    {
+      "src": "/screenshot-wide.png",
+      "sizes": "1280x800",
+      "type": "image/png",
+      "form_factor": "wide",
+      "label": "Writing a word list on the manuscript-paper grid, with the card layout options"
+    },
+    {
+      "src": "/screenshot-narrow.png",
+      "sizes": "780x1688",
+      "type": "image/png",
+      "form_factor": "narrow",
+      "label": "Looked-up cards with pinyin and meanings, ready to export"
+    }
+  ],
+  "shortcuts": [
+    {
+      "name": "How to use Delphinus",
+      "short_name": "Guide",
+      "description": "Writing word lists, scanning images and importing into Anki, Quizlet or Vaia",
+      "url": "/guide",
+      "icons": [{ "src": "/android-chrome-192x192.png", "sizes": "192x192", "type": "image/png" }]
+    }
+  ]
 }
