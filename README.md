@@ -1,5 +1,5 @@
 <p align="center">
- <a href="https://delphinus.mariinkys.dev" target="_blank"><img alt="Delphinus" src="https://github.com/mariinkys/delphinus/blob/main/assets/delphinus_banner.png?raw=true"></a>
+ <a href="https://delphinus.mariinkys.dev" target="_blank"><img alt="Delphinus" src="./assets/delphinus_banner.png"></a>
 </p>
 
 <p align="center">

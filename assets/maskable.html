@@ -1,0 +1,15 @@
+<!doctype html><html><head><meta charset="utf-8"><!-- Maskable icon: full bleed, mark inside the central 80% safe circle. -->
+<style>
+:root{--paper:#e9efe9;--sheet:#f7f9f5;--ink:#1e2b2f;--grid:#9fbdab;--jade:#1d6b58}
+html,body{margin:0;background:transparent}
+.tile{width:640px;height:640px;background:var(--paper);display:grid;place-items:center}
+/* The genkō yōshi block: 2 × 2 cells, read top to bottom in the right column. */
+.sheet{display:grid;grid-template-columns:repeat(2,165px);grid-template-rows:repeat(2,165px);background:var(--sheet);
+  box-shadow:0 0 0 3px var(--grid), 0 0 0 10px var(--paper), 0 0 0 13px var(--grid)}
+.sheet span{display:grid;place-items:center;font:600 130px/1 "Noto Serif CJK JP";color:var(--ink);padding-bottom:6px}
+.sheet span:nth-child(1){border-right:3px solid var(--grid);border-bottom:3px solid var(--grid)}
+.sheet span:nth-child(2){border-bottom:3px solid var(--grid)}
+.sheet span:nth-child(3){border-right:3px solid var(--grid);background:var(--jade)}
+</style></head><body>
+<div class="tile"><div class="sheet"><span></span><span>海</span><span></span><span>豚</span></div></div>
+</body></html>
