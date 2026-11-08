@@ -1,123 +1,147 @@
-pub mod components;
-pub mod config;
-pub mod core;
-pub mod pages;
+#![recursion_limit = "256"]
+#[cfg(feature = "ssr")]
+fn main() -> std::io::Result<()> {
+    // `delphinus ocr-worker`: the OCR child process (src/ocr.rs)
+    #[cfg(feature = "ocr")]
+    {
+        let args: Vec<_> = std::env::args_os().collect();
+        if args.get(1).is_some_and(|a| a == "ocr-worker") {
+            let dir = args
+                .get(2)
+                .map(std::path::PathBuf::from)
+                .unwrap_or_else(|| "ocr_models".into());
+            delphinus::ocr::worker_main(&dir);
+        }
+    }
+
+    // A small, fixed number of worker threads, more threads would only add stacks and allocator arenas
+    let workers = env_parse("DELPHINUS_THREADS", 2usize).max(1);
+    tokio::runtime::Builder::new_multi_thread()
+        .worker_threads(workers)
+        .max_blocking_threads(4)
+        .thread_keep_alive(std::time::Duration::from_secs(10))
+        .enable_all()
+        .build()?
+        .block_on(server::run())
+}
 
 #[cfg(feature = "ssr")]
-#[actix_web::main]
-async fn main() -> std::io::Result<()> {
-    use crate::{config::DelphinusConfig, core::flashcard_generation::dictionaries};
-    use actix_files::Files;
-    use actix_web::*;
-    use delphinus::app::*;
-    use leptos::config::get_configuration;
+fn env_parse<T: std::str::FromStr>(key: &str, default: T) -> T {
+    std::env::var(key)
+        .ok()
+        .and_then(|v| v.parse().ok())
+        .unwrap_or(default)
+}
+
+#[cfg(feature = "ssr")]
+mod server {
+    use super::env_parse;
+    use axum::{
+        Router,
+        extract::DefaultBodyLimit,
+        routing::{get, post},
+    };
+    use delphinus::{app::*, dict::Dictionaries, ocr};
     use leptos::prelude::*;
-    use leptos_actix::{LeptosRoutes, generate_route_list};
-    use leptos_meta::MetaTags;
-    use oar_ocr::prelude::OAROCRBuilder;
-    use std::sync::Arc;
+    use leptos_axum::{LeptosRoutes, generate_route_list};
+    use std::path::PathBuf;
 
-    let conf = get_configuration(None).unwrap();
-    let addr = conf.leptos_options.site_addr;
+    /// Files under /pkg carry a content hash in their name (`hash-files`), so browsers may keep them forever
+    async fn cache_hashed_assets(
+        req: axum::extract::Request,
+        next: axum::middleware::Next,
+    ) -> axum::response::Response {
+        use axum::http::{HeaderValue, header::CACHE_CONTROL};
+        let hashed = req.uri().path().starts_with("/pkg/");
+        let mut res = next.run(req).await;
+        if hashed && res.status().is_success() {
+            res.headers_mut().insert(
+                CACHE_CONTROL,
+                HeaderValue::from_static("public, max-age=31536000, immutable"),
+            );
+        }
+        res
+    }
 
-    let jap_dictionary =
-        dictionaries::JapaneseDictionary::init(String::from("dictionaries/jp/new_jmdict.txt"))
-            .await
-            .expect("Failed to load Japanese Dictionary");
+    pub async fn run() -> std::io::Result<()> {
+        let conf = get_configuration(None).expect("invalid Leptos configuration");
+        let options = conf.leptos_options;
+        let addr = options.site_addr;
 
-    let ch_dictionary =
-        dictionaries::ChineseDictionary::init(String::from("dictionaries/ch/cedict_ts.u8"))
-            .await
-            .expect("Failed to load Chinese Dictionary");
+        let path = |key: &str, default: &str| {
+            PathBuf::from(std::env::var(key).unwrap_or_else(|_| default.into()))
+        };
+        let started = std::time::Instant::now();
+        Dictionaries::load(
+            &path("DELPHINUS_JMDICT", "dictionaries/JMdict_e"),
+            &path("DELPHINUS_CEDICT", "dictionaries/cedict_ts.u8"),
+        );
+        eprintln!("dictionaries ready in {:?}", started.elapsed());
 
-    let ocr_client = Arc::new(
-        OAROCRBuilder::new(
-            String::from("ocr_models/ppocrv5_mobile_det.onnx"),
-            String::from("ocr_models/ppocrv5_mobile_rec.onnx"),
-            String::from("ocr_models/ppocrv5_dict.txt"),
-        )
-        .build()
-        .expect("Failed to create OCR Client"),
-    );
+        tokio::spawn(async {
+            let mut tick = tokio::time::interval(std::time::Duration::from_secs(30));
+            loop {
+                tick.tick().await;
+                if let Some(d) = Dictionaries::get() {
+                    d.release_pages();
+                }
+            }
+        });
 
-    let _shared_config = SharedValue::new(DelphinusConfig::get);
+        let ocr_off = std::env::var("DISABLE_OCR").is_ok_and(|v| v.eq_ignore_ascii_case("true"));
+        #[cfg(feature = "ocr")]
+        if !ocr_off {
+            ocr::init(
+                path("DELPHINUS_OCR_DIR", "ocr_models"),
+                std::time::Duration::from_secs(env_parse("DELPHINUS_OCR_IDLE_SECS", 300u64)),
+            );
+        }
+        let _ = (ocr_off, env_parse::<u8>);
 
-    println!("listening on http://{}", &addr);
-
-    HttpServer::new(move || {
-        // Generate the list of routes in your Leptos App
         let routes = generate_route_list(App);
-        let leptos_options = &conf.leptos_options;
-        let site_root = leptos_options.site_root.clone().to_string();
+        let app = Router::new()
+            .route(
+                "/api/ocr",
+                post(ocr::handler).layer(DefaultBodyLimit::max(8 * 1024 * 1024)),
+            )
+            .route("/healthz", get(|| async { "ok" }))
+            .route(
+                "/faq",
+                get(|| async { axum::response::Redirect::permanent("/guide") }),
+            )
+            .route(
+                "/generator",
+                get(|| async { axum::response::Redirect::permanent("/") }),
+            )
+            .leptos_routes(&options, routes, {
+                let options = options.clone();
+                move || shell(options.clone())
+            })
+            .fallback(leptos_axum::file_and_error_handler(shell))
+            .layer(axum::middleware::from_fn(cache_hashed_assets))
+            .with_state(options);
 
-        App::new()
-            // serve JS/WASM/CSS from `pkg`
-            .service(Files::new("/pkg", format!("{site_root}/pkg")))
-            // serve other assets from the `assets` directory
-            .service(Files::new("/assets", &site_root))
-            // serve the favicon from /favicon.ico
-            .service(favicon)
-            .leptos_routes(routes, {
-                let leptos_options = leptos_options.clone();
-                move || {
-                    view! {
-                        <!DOCTYPE html>
-                        <html lang="en">
-                            <head>
-                                <meta charset="utf-8"/>
-                                <meta name="viewport" content="width=device-width, initial-scale=1"/>
-                                <AutoReload options=leptos_options.clone() />
-                                <HydrationScripts options=leptos_options.clone()/>
-                                <MetaTags/>
-                            </head>
-                            <body>
-                                <App/>
-                            </body>
-                        </html>
+        let listener = tokio::net::TcpListener::bind(&addr).await?;
+        eprintln!("listening on http://{addr}");
+        axum::serve(listener, app.into_make_service())
+            .with_graceful_shutdown(async {
+                #[cfg(unix)]
+                {
+                    use tokio::signal::unix::{SignalKind, signal};
+                    let mut term = signal(SignalKind::terminate()).expect("signal handler");
+                    tokio::select! {
+                        _ = tokio::signal::ctrl_c() => {},
+                        _ = term.recv() => {},
                     }
                 }
+                #[cfg(not(unix))]
+                let _ = tokio::signal::ctrl_c().await;
             })
-            .app_data(web::Data::new(leptos_options.to_owned()))
-            //pass dictionaries
-            .app_data(web::Data::new(jap_dictionary.to_owned()))
-            .app_data(web::Data::new(ch_dictionary.to_owned()))
-            //pass ocr client
-            .app_data(web::Data::new(ocr_client.to_owned()))
-        //.wrap(middleware::Compress::default())
-    })
-    .bind(&addr)?
-    .run()
-    .await
+            .await
+    }
 }
 
-#[cfg(feature = "ssr")]
-#[actix_web::get("favicon.ico")]
-async fn favicon(
-    leptos_options: actix_web::web::Data<leptos::config::LeptosOptions>,
-) -> actix_web::Result<actix_files::NamedFile> {
-    let leptos_options = leptos_options.into_inner();
-    let site_root = &leptos_options.site_root;
-    Ok(actix_files::NamedFile::open(format!(
-        "{site_root}/favicon.ico"
-    ))?)
-}
-
-#[cfg(not(any(feature = "ssr", feature = "csr")))]
+#[cfg(not(feature = "ssr"))]
 pub fn main() {
-    // no client-side main function
-    // unless we want this to work with e.g., Trunk for pure client-side testing
-    // see lib.rs for hydration function instead
-    // see optional feature `csr` instead
-}
-
-#[cfg(all(not(feature = "ssr"), feature = "csr"))]
-pub fn main() {
-    // a client-side main function is required for using `trunk serve`
-    // prefer using `cargo leptos serve` instead
-    // to run: `trunk serve --open --features csr`
-    use delphinus::app::*;
-
-    console_error_panic_hook::set_once();
-
-    leptos::mount_to_body(App);
+    // The browser entry point is `hydrate()` in lib.rs.
 }

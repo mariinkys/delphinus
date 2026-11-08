@@ -1,63 +1,61 @@
+use crate::{
+    components::layout::{SiteFooter, SiteHeader},
+    pages::{Guide, NotFound, Workspace},
+};
 use leptos::prelude::*;
-use leptos_meta::{Link, Stylesheet, Title, provide_meta_context};
+use leptos_meta::{HashedStylesheet, Link, Meta, MetaTags, Title, provide_meta_context};
 use leptos_router::{
     components::{Route, Router, Routes},
     path,
 };
 
-use crate::{
-    components::{NavbarComponent, ToastComponent},
-    config::DelphinusConfig,
-    pages::{FaqPage, GeneratorPage, HomePage, NotFound},
-};
+/// Applies the saved theme before first paint, so dark mode never flashes
+const THEME_SCRIPT: &str = "try{var t=localStorage.getItem('delphinus.theme');if(t)document.documentElement.setAttribute('data-theme',t)}catch(e){}";
+
+pub fn shell(options: LeptosOptions) -> impl IntoView {
+    view! {
+        <!DOCTYPE html>
+        <html lang="en">
+            <head>
+                <meta charset="utf-8" />
+                <meta name="viewport" content="width=device-width, initial-scale=1" />
+                <meta name="color-scheme" content="light dark" />
+                <script inner_html=THEME_SCRIPT></script>
+                <HashedStylesheet options=options.clone() id="leptos" />
+                <AutoReload options=options.clone() />
+                <HydrationScripts options />
+                <MetaTags />
+            </head>
+            <body>
+                <App />
+            </body>
+        </html>
+    }
+}
 
 #[component]
 pub fn App() -> impl IntoView {
-    // Provides context that manages stylesheets, titles, meta tags, etc.
     provide_meta_context();
 
-    // Provides the config as a context
-    let (read, _write) =
-        signal::<DelphinusConfig>(SharedValue::new(DelphinusConfig::get).into_inner());
-    provide_context::<ReadSignal<DelphinusConfig>>(read);
-
     view! {
-        // injects a stylesheet into the document <head>
-        // id=leptos means cargo-leptos will hot-reload this stylesheet
-        <Stylesheet id="leptos" href="/pkg/delphinus.css"/>
+        <Title formatter=|t: String| if t.is_empty() { "Delphinus".to_string() } else { format!("{t} | Delphinus") } />
+        <Meta name="description" content="Turn a list of Chinese or Japanese words into flashcards for Anki, Quizlet or Vaia, with readings and meanings from CC-CEDICT and JMdict." />
+        <Meta name="theme-color" content="#e9efe9" />
+        <Link rel="icon" type_="image/png" sizes="32x32" href="/favicon-32x32.png" />
+        <Link rel="icon" type_="image/png" sizes="16x16" href="/favicon-16x16.png" />
+        <Link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png" />
+        <Link rel="manifest" href="/site.webmanifest" />
 
-        // sets the document title
-        <Title text="Delphinus"/>
-
-        <Link rel="apple-touch-icon" sizes="180x180" href="/assets/apple-touch-icon.png" />
-        <Link rel="icon" type_="image/png" sizes="32x32" href="/assets/favicon-32x32.png" />
-        <Link rel="icon" type_="image/png" sizes="16x16" href="/assets/favicon-16x16.png" />
-        <Link rel="manifest" href="/assets/site.webmanifest" />
-
-        <ToastComponent/>
-        <NavbarComponent/>
-
-        // content for this welcome page
         <Router>
-            <main>
-                <Routes fallback=move || "Not found.">
-                    <Route path=path!("") view=HomePage/>
-                    <Route path=path!("/generator") view=GeneratorPage/>
-                    <Route path=path!("/faq") view=FaqPage/>
-                    <Route path=path!("any") view=NotFound/>
+            <a class="skip" href="#main">"Skip to content"</a>
+            <SiteHeader />
+            <main id="main">
+                <Routes fallback=|| view! { <NotFound /> }>
+                    <Route path=path!("") view=Workspace />
+                    <Route path=path!("/guide") view=Guide />
                 </Routes>
             </main>
+            <SiteFooter />
         </Router>
-
-        <footer class="w-full p-4 gap-2 flex sm:flex-row flex-col bg-base-200 text-base-content">
-            <aside class="grow sm:text-left text-center">
-                <p>"Made by Alex Marín - FLOSS, now and always! - "<a class="link-primary" href="https://github.com/mariinkys/delphinus/releases" target="_blank">"v"{env!("CARGO_PKG_VERSION")}</a></p>
-            </aside>
-            <nav class="flex gap-3 text-center justify-center">
-                <a href="https://github.com/mariinkys/delphinus" target="_blank"><svg class="fill-current" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24"><path d="M12 0c-6.626 0-12 5.373-12 12 0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23.957-.266 1.983-.399 3.003-.404 1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576 4.765-1.589 8.199-6.086 8.199-11.386 0-6.627-5.373-12-12-12z"/></svg></a>
-                <a href="https://www.buymeacoffee.com/mariinkys" target="_blank"><svg class="fill-current" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24"><path d="m20.216 6.415-.132-.666c-.119-.598-.388-1.163-1.001-1.379-.197-.069-.42-.098-.57-.241-.152-.143-.196-.366-.231-.572-.065-.378-.125-.756-.192-1.133-.057-.325-.102-.69-.25-.987-.195-.4-.597-.634-.996-.788a5.723 5.723 0 0 0-.626-.194c-1-.263-2.05-.36-3.077-.416a25.834 25.834 0 0 0-3.7.062c-.915.083-1.88.184-2.75.5-.318.116-.646.256-.888.501-.297.302-.393.77-.177 1.146.154.267.415.456.692.58.36.162.737.284 1.123.366 1.075.238 2.189.331 3.287.37 1.218.05 2.437.01 3.65-.118.299-.033.598-.073.896-.119.352-.054.578-.513.474-.834-.124-.383-.457-.531-.834-.473-.466.074-.96.108-1.382.146-1.177.08-2.358.082-3.536.006a22.228 22.228 0 0 1-1.157-.107c-.086-.01-.18-.025-.258-.036-.243-.036-.484-.08-.724-.13-.111-.027-.111-.185 0-.212h.005c.277-.06.557-.108.838-.147h.002c.131-.009.263-.032.394-.048a25.076 25.076 0 0 1 3.426-.12c.674.019 1.347.067 2.017.144l.228.031c.267.04.533.088.798.145.392.085.895.113 1.07.542.055.137.08.288.111.431l.319 1.484a.237.237 0 0 1-.199.284h-.003c-.037.006-.075.01-.112.015a36.704 36.704 0 0 1-4.743.295 37.059 37.059 0 0 1-4.699-.304c-.14-.017-.293-.042-.417-.06-.326-.048-.649-.108-.973-.161-.393-.065-.768-.032-1.123.161-.29.16-.527.404-.675.701-.154.316-.199.66-.267 1-.069.34-.176.707-.135 1.056.087.753.613 1.365 1.37 1.502a39.69 39.69 0 0 0 11.343.376.483.483 0 0 1 .535.53l-.071.697-1.018 9.907c-.041.41-.047.832-.125 1.237-.122.637-.553 1.028-1.182 1.171-.577.131-1.165.2-1.756.205-.656.004-1.31-.025-1.966-.022-.699.004-1.556-.06-2.095-.58-.475-.458-.54-1.174-.605-1.793l-.731-7.013-.322-3.094c-.037-.351-.286-.695-.678-.678-.336.015-.718.3-.678.679l.228 2.185.949 9.112c.147 1.344 1.174 2.068 2.446 2.272.742.12 1.503.144 2.257.156.966.016 1.942.053 2.892-.122 1.408-.258 2.465-1.198 2.616-2.657.34-3.332.683-6.663 1.024-9.995l.215-2.087a.484.484 0 0 1 .39-.426c.402-.078.787-.212 1.074-.518.455-.488.546-1.124.385-1.766zm-1.478.772c-.145.137-.363.201-.578.233-2.416.359-4.866.54-7.308.46-1.748-.06-3.477-.254-5.207-.498-.17-.024-.353-.055-.47-.18-.22-.236-.111-.71-.054-.995.052-.26.152-.609.463-.646.484-.057 1.046.148 1.526.22.577.088 1.156.159 1.737.212 2.48.226 5.002.19 7.472-.14.45-.06.899-.13 1.345-.21.399-.072.84-.206 1.08.206.166.281.188.657.162.974a.544.544 0 0 1-.169.364zm-6.159 3.9c-.862.37-1.84.788-3.109.788a5.884 5.884 0 0 1-1.569-.217l.877 9.004c.065.78.717 1.38 1.5 1.38 0 0 1.243.065 1.658.065.447 0 1.786-.065 1.786-.065.783 0 1.434-.6 1.499-1.38l.94-9.95a3.996 3.996 0 0 0-1.322-.238c-.826 0-1.491.284-2.26.613z"/></svg></a>
-                <a href="https://mastodon.social/@mariinkys" target="_blank"><svg class="fill-current" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24"><path d="M21.327 8.566c0-4.339-2.843-5.61-2.843-5.61-1.433-.658-3.894-.935-6.451-.956h-.063c-2.557.021-5.016.298-6.45.956 0 0-2.843 1.272-2.843 5.61 0 .993-.019 2.181.012 3.441.103 4.243.778 8.425 4.701 9.463 1.809.479 3.362.579 4.612.51 2.268-.126 3.541-.809 3.541-.809l-.075-1.646s-1.621.511-3.441.449c-1.804-.062-3.707-.194-3.999-2.409a4.523 4.523 0 0 1-.04-.621s1.77.433 4.014.536c1.372.063 2.658-.08 3.965-.236 2.506-.299 4.688-1.843 4.962-3.254.434-2.223.398-5.424.398-5.424zm-3.353 5.59h-2.081V9.057c0-1.075-.452-1.62-1.357-1.62-1 0-1.501.647-1.501 1.927v2.791h-2.069V9.364c0-1.28-.501-1.927-1.502-1.927-.905 0-1.357.546-1.357 1.62v5.099H6.026V8.903c0-1.074.273-1.927.823-2.558.566-.631 1.307-.955 2.228-.955 1.065 0 1.872.409 2.405 1.228l.518.869.519-.869c.533-.819 1.34-1.228 2.405-1.228.92 0 1.662.324 2.228.955.549.631.822 1.484.822 2.558v5.253z"/></svg></a>
-            </nav>
-        </footer>
     }
 }

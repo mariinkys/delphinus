@@ -3,36 +3,85 @@
 </p>
 
 <p align="center">
- This project contains a small web application written in Rust with the <a href="https://leptos.dev/" target="_blank">Leptos</a> framework, it can generate flashcards compatible with Quizlet, Vaia and Anki for both Chinese and Japanese.
+ Turn a list of Chinese or Japanese words into flashcards for Anki, Quizlet or Vaia.
+ Written in Rust with <a href="https://leptos.dev/">Leptos</a>
 </p>
 
+## Running
 
-## How to Use?
+```sh
+# Dictionaries
+curl -L http://ftp.edrdg.org/pub/Nihongo/JMdict_e.gz | gunzip > dictionaries/JMdict_e
+curl -L https://www.mdbg.net/chinese/export/cedict/cedict_1_0_ts_utf-8_mdbg.txt.gz | gunzip > dictionaries/cedict_ts.u8
 
-[See the FAQ](https://delphinus.mariinkys.dev/faq)
+# Build Tools
+rustup target add wasm32-unknown-unknown
+cargo install cargo-leptos
+
+# Run
+cargo leptos watch                               # development, no OCR
+cargo leptos build --release --bin-features ocr-bundled   # with OCR
+```
+
+Stable Rust is enough; nightly is no longer required. There is no npm or Tailwind step: the
+stylesheet is plain CSS in `style/main.css`.
+
+To update a dictionary, replace the file (download to a new name, then `mv` it over the old
+one) and restart. Never edit a mapped file in place.
+
+### Docker
+
+```sh
+docker build -t delphinus .
+docker run -p 8080:8080 delphinus
+```
+
+The image downloads the latest JMdict_e, CC-CEDICT and OCR models at build time.
+Build with `--build-arg FEATURES=ssr` for an image without OCR.
+
+### Configuration
+
+| Variable | Default | |
+|---|---|---|
+| `DELPHINUS_JMDICT` | `dictionaries/JMdict_e` | Path to the JMdict XML (uncompressed) |
+| `DELPHINUS_CEDICT` | `dictionaries/cedict_ts.u8` | Path to CC-CEDICT |
+| `DELPHINUS_THREADS` | `2` | Worker threads |
+| `DELPHINUS_OCR_DIR` | `ocr_models` | Folder with the three OCR model files |
+| `DELPHINUS_OCR_IDLE_SECS` | `300` | Unload OCR models after this long unused |
+| `DISABLE_OCR` | `false` | Turn image scanning off |
+| `MALLOC_ARENA_MAX` | (set to `2` in Docker) | Fewer glibc arenas, less retained memory |
+
+Plus the usual `LEPTOS_*` variables (`LEPTOS_SITE_ADDR`, `LEPTOS_SITE_ROOT`, …).
+
+A missing dictionary disables that language
 
 ## Development Notes
 
-Remember the env variables needed for the server binary:
-```
-export LEPTOS_OUTPUT_NAME="leptos_start"
-export LEPTOS_SITE_ROOT="site" #necessary
-export LEPTOS_SITE_PKG_DIR="pkg"
-export LEPTOS_SITE_ADDR="127.0.0.1:3000"
-export LEPTOS_RELOAD_PORT="3001"
-```
+* **Memory-mapped, indexed once.** At start-up each file is mmaped and scanned once for the
+  byte offset of every headword (kanji forms and readings for JMdict, traditional and simplified
+  for CC-CEDICT). The offsets are sorted by the text they point at, so a lookup is a binary search
+  over the map, and only matching entries are parsed. The index costs 4 bytes per headword
+  (≈ 2 MB for JMdict, ≈ 1 MB for CC-CEDICT); the dictionaries themselves stay in the kernel page
+  cache, outside the process heap. After indexing, the scanned pages are released from the
+  process (`MADV_DONTNEED`) and read-ahead is switched off (`MADV_RANDOM`).
+* **OCR is lazy.** The models load on the first scan, one scan runs at a time, and they are
+  unloaded after `DELPHINUS_OCR_IDLE_SECS` without use. Images are scaled down in the browser
+  before upload.
+
 
 ## Thanks
 
-You can also help do this and more projects, [Buy me a coffee](https://www.buymeacoffee.com/mariinkys)
+You can help this and other projects: [Buy me a coffee](https://www.buymeacoffee.com/mariinkys)
 
 ## Acknowledgements
 
-This site uses the <a class="link-primary" href="https://www.edrdg.org/wiki/index.php/JMdict-EDICT_Dictionary_Project">JMdict/EDICT</a>
- and <a class="link-primary" href="https://www.edrdg.org/wiki/index.php/KANJIDIC_Project">KANJIDIC </a> dictionary files.
-These files are the property of the <a class="link-primary" href="https://www.edrdg.org/">Electronic Dictionary Research and Development Group</a>
-, and are used in conformance with the Group's<a class="link-primary" href="https://www.edrdg.org/edrdg/licence.html"> licence</a>.
+This site uses the [JMdict/EDICT](https://www.edrdg.org/wiki/index.php/JMdict-EDICT_Dictionary_Project)
+dictionary files. These files are the property of the
+[Electronic Dictionary Research and Development Group](https://www.edrdg.org/), and are used in
+conformance with the Group's [licence](https://www.edrdg.org/edrdg/licence.html).
 
-This site uses the <a class="link-primary" href="https://www.mdbg.net/chinese/dictionary?page=cedict">CC-CEDICT </a> dictionary files and are used in conformance with its license.
+This site uses the [CC-CEDICT](https://cc-cedict.org/wiki/) dictionary, licensed under
+Creative Commons Attribution-ShareAlike 4.0.
 
-For OCR this project makes use of the awesome [oar-ocr](https://github.com/GreatV/oar-ocr) crate and it's models. For more information take a look [here](https://github.com/mariinkys/delphinus/blob/main/ocr_models/README.md).
+OCR uses the [oar-ocr](https://github.com/GreatV/oar-ocr) crate and its PP-OCRv5 models
+(Apache-2.0); see [ocr_models/README.md](ocr_models/README.md).

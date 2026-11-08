@@ -1,31 +1,23 @@
 use leptos::prelude::*;
+use leptos_meta::Title;
+use leptos_router::components::A;
 
-/// 404 - Not Found
 #[component]
 pub fn NotFound() -> impl IntoView {
-    // set an HTTP status code 404
-    // this is feature gated because it can only be done during
-    // initial server-side rendering
-    // if you navigate to the 404 page subsequently, the status
-    // code will not be set because there is not a new HTTP request
-    // to the server
     #[cfg(feature = "ssr")]
-    {
-        // this can be done inline because it's synchronous
-        // if it were async, we'd use a server function
-        let resp = expect_context::<leptos_actix::ResponseOptions>();
-        resp.set_status(actix_web::http::StatusCode::NOT_FOUND);
+    if let Some(resp) = use_context::<leptos_axum::ResponseOptions>() {
+        resp.set_status(axum::http::StatusCode::NOT_FOUND);
     }
-
     view! {
-        <div class="hero min-h-[90vh]">
-            <div class="hero-content text-center">
-                <div class="max-w-md">
-                    <h1 class="text-5xl font-bold">"404"</h1>
-                    <p class="py-6">"Page not found"</p>
-                    <a href="/" class="btn btn-primary">"Return Home"</a>
-                </div>
-            </div>
+        <Title text="Page not found" />
+        <div class="not-found">
+            <p class="not-found-cells" aria-hidden="true">
+                <span>"无"</span>
+                <span>"い"</span>
+            </p>
+            <h1>"There is no page at this address"</h1>
+            <p>"The link may be old or mistyped."</p>
+            <A href="/" attr:class="button button-primary">"Make flashcards"</A>
         </div>
     }
 }
