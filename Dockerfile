@@ -18,7 +18,7 @@ COPY . .
 # `ocr-bundled` links ONNX Runtime statically; use `--bin-features ssr` for a
 # build without image scanning.
 ARG FEATURES=ocr-bundled
-RUN cargo leptos build --release --bin-features "$FEATURES" \
+RUN LEPTOS_HASH_FILES=true cargo leptos build --release --bin-features "$FEATURES" \
  && find target/site -type f \( -name '*.js' -o -name '*.wasm' -o -name '*.css' -o -name '*.webmanifest' \) \
       -exec brotli -kq 11 {} \; -exec gzip -k9 {} \;
 

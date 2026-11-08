@@ -20,14 +20,8 @@ cargo install cargo-leptos
 
 # Run
 cargo leptos watch                               # development, no OCR
-cargo leptos build --release --bin-features ocr-bundled   # with OCR
+LEPTOS_HASH_FILES=true cargo leptos build --release --bin-features ocr-bundled   # with OCR
 ```
-
-Stable Rust is enough; nightly is no longer required. There is no npm or Tailwind step: the
-stylesheet is plain CSS in `style/main.css`.
-
-To update a dictionary, replace the file (download to a new name, then `mv` it over the old
-one) and restart. Never edit a mapped file in place.
 
 ### Docker
 

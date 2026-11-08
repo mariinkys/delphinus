@@ -46,19 +46,35 @@ mod server {
     use leptos_axum::{LeptosRoutes, generate_route_list};
     use std::path::PathBuf;
 
-    /// Files under /pkg carry a content hash in their name (`hash-files`), so browsers may keep them forever
-    async fn cache_hashed_assets(
+    /// Whether a file name carries a cargo-leptos content hash
+    /// Only `cargo leptos build` adds hashes; `cargo leptos watch` serves
+    /// plain `delphinus.css`, which must never be cached forever
+    pub(crate) fn is_hashed(path: &str) -> bool {
+        let name = path.rsplit('/').next().unwrap_or(path);
+        name.split('.').skip(1).any(|part| {
+            part.len() == 22
+                && part
+                    .bytes()
+                    .all(|b| b.is_ascii_alphanumeric() || b == b'-' || b == b'_')
+        })
+    }
+
+    /// Hashed files may be kept forever: a new build gives them a new name
+    async fn cache_headers(
         req: axum::extract::Request,
         next: axum::middleware::Next,
     ) -> axum::response::Response {
         use axum::http::{HeaderValue, header::CACHE_CONTROL};
-        let hashed = req.uri().path().starts_with("/pkg/");
+        let path = req.uri().path().to_owned();
         let mut res = next.run(req).await;
-        if hashed && res.status().is_success() {
-            res.headers_mut().insert(
-                CACHE_CONTROL,
-                HeaderValue::from_static("public, max-age=31536000, immutable"),
-            );
+        if path.starts_with("/pkg/") && res.status().is_success() {
+            let value = if is_hashed(&path) {
+                "public, max-age=31536000, immutable"
+            } else {
+                "no-cache"
+            };
+            res.headers_mut()
+                .insert(CACHE_CONTROL, HeaderValue::from_static(value));
         }
         res
     }
@@ -118,7 +134,7 @@ mod server {
                 move || shell(options.clone())
             })
             .fallback(leptos_axum::file_and_error_handler(shell))
-            .layer(axum::middleware::from_fn(cache_hashed_assets))
+            .layer(axum::middleware::from_fn(cache_headers))
             .with_state(options);
 
         let listener = tokio::net::TcpListener::bind(&addr).await?;
@@ -144,4 +160,21 @@ mod server {
 #[cfg(not(feature = "ssr"))]
 pub fn main() {
     // The browser entry point is `hydrate()` in lib.rs.
+}
+
+#[cfg(all(test, feature = "ssr"))]
+mod tests {
+    use super::server::is_hashed;
+
+    #[test]
+    fn recognises_hashed_assets() {
+        assert!(is_hashed("/pkg/delphinus.uPi5MofTdzMX4W5T8WrfPQ.css"));
+        assert!(is_hashed("/pkg/delphinus.o8g-JOWX_XBGhMFDf9b-Hg.wasm"));
+        assert!(
+            !is_hashed("/pkg/delphinus.css"),
+            "cargo leptos watch output"
+        );
+        assert!(!is_hashed("/pkg/delphinus_bg.wasm"));
+        assert!(!is_hashed("/pkg/delphinus.js"));
+    }
 }

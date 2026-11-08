@@ -23,7 +23,7 @@ wasm-bindgen = "0.2.130"
 wasm-bindgen-futures = "0.4"
 js-sys = "0.3"
 console_error_panic_hook = "0.1.7"
-web-sys = { version = "0.3", features = ["Blob", "BlobPropertyBag", "Clipboard", "DataTransfer", "DataTransferItem", "DataTransferItemList", "Document", "DragEvent", "Element", "File", "FileList", "HtmlAnchorElement", "HtmlCanvasElement", "HtmlInputElement", "HtmlTextAreaElement", "InputEvent", "CompositionEvent", "ImageBitmap", "CanvasRenderingContext2d", "Navigator", "Request", "RequestInit", "Response", "Storage", "Url", "Window", "ClipboardEvent", "KeyboardEvent", "MediaQueryList", "OffscreenCanvas", "OffscreenCanvasRenderingContext2d", "ImageEncodeOptions", "Headers"] }
+web-sys = { version = "0.3", features = ["Blob", "BlobPropertyBag", "Clipboard", "DataTransfer", "DataTransferItem", "DataTransferItemList", "Document", "DragEvent", "Element", "File", "FileList", "HtmlAnchorElement", "HtmlCanvasElement", "HtmlDialogElement", "HtmlInputElement", "HtmlTextAreaElement", "InputEvent", "CompositionEvent", "ImageBitmap", "CanvasRenderingContext2d", "Navigator", "Request", "RequestInit", "Response", "Storage", "Url", "Window", "ClipboardEvent", "KeyboardEvent", "MediaQueryList", "OffscreenCanvas", "OffscreenCanvasRenderingContext2d", "ImageEncodeOptions", "Headers"] }
 
 [features]
 hydrate = ["leptos/hydrate"]
@@ -63,4 +63,4 @@ bin-default-features = false
 lib-features = ["hydrate"]
 lib-default-features = false
 lib-profile-release = "wasm-release"
-hash-files = true
+hash-files = false

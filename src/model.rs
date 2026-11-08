@@ -467,6 +467,71 @@ pub fn export(target: ExportTarget, cards: &[(String, String)]) -> String {
     }
 }
 
+/// Separators chosen by the person for the custom export, stored as typed:
+/// `\t` and `\n` are written as two characters and expanded on export
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct CustomFormat {
+    /// Between the front and the back of a card
+    pub between_sides: String,
+    /// Between one card and the next
+    pub between_cards: String,
+}
+
+impl Default for CustomFormat {
+    fn default() -> Self {
+        Self {
+            between_sides: "\\t".into(),
+            between_cards: "\\n".into(),
+        }
+    }
+}
+
+/// Expands `\t`, `\n`, `\r` and `\\` typed in a text box
+pub fn unescape_separator(s: &str) -> String {
+    let mut out = String::with_capacity(s.len());
+    let mut chars = s.chars();
+    while let Some(c) = chars.next() {
+        if c != '\\' {
+            out.push(c);
+            continue;
+        }
+        match chars.next() {
+            Some('t') => out.push('\t'),
+            Some('n') => out.push('\n'),
+            Some('r') => out.push('\r'),
+            Some('\\') => out.push('\\'),
+            Some(other) => {
+                out.push('\\');
+                out.push(other);
+            }
+            None => out.push('\\'),
+        }
+    }
+    out
+}
+
+/// Joins the cards with the person's own separators. A separator that also
+/// appears inside a card is replaced by a space there, so the output always
+/// splits back into the same cards
+pub fn export_custom(cards: &[(String, String)], fmt: &CustomFormat) -> String {
+    let sides = unescape_separator(&fmt.between_sides);
+    let between = unescape_separator(&fmt.between_cards);
+    let clean = |s: &str| {
+        let mut t = one_line(s);
+        for sep in [&sides, &between] {
+            if !sep.is_empty() && t.contains(sep.as_str()) {
+                t = t.replace(sep.as_str(), " ");
+            }
+        }
+        t
+    };
+    cards
+        .iter()
+        .map(|(f, b)| format!("{}{sides}{}", clean(f), clean(b)))
+        .collect::<Vec<_>>()
+        .join(&between)
+}
+
 /// Friendly names for the most frequent JMdict part-of-speech codes
 pub fn tag_label(tag: &str) -> &str {
     match tag {
@@ -581,6 +646,29 @@ mod tests {
         };
         assert_eq!(card_front(&cand(), Lang::Zh, &f2), "学 [xue2]");
         assert_eq!(card_back(&cand(), Lang::Zh, &f2), "to learn; to study");
+    }
+
+    #[test]
+    fn custom_export() {
+        let cards = vec![
+            ("学".to_string(), "to learn; to study".to_string()),
+            ("中文".to_string(), "Chinese".to_string()),
+        ];
+        let tsv = CustomFormat::default();
+        assert_eq!(
+            export_custom(&cards, &tsv),
+            "学\tto learn; to study\n中文\tChinese"
+        );
+        let own = CustomFormat {
+            between_sides: " = ".into(),
+            between_cards: ";".into(),
+        };
+        assert_eq!(
+            export_custom(&cards, &own),
+            "学 = to learn  to study;中文 = Chinese",
+            "separator inside a card is replaced"
+        );
+        assert_eq!(unescape_separator("a\\tb\\\\n\\x\\"), "a\tb\\n\\x\\");
     }
 
     #[test]
