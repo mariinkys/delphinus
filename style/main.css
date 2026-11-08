@@ -462,11 +462,15 @@ fieldset {
   --glyph: 30px;
   display: block;
   width: 100%;
-  min-height: calc(var(--cell) * 6 + 2px);
-  max-height: 70vh;
+  /* Six rows until the script sizes it to its text in whole rows (see
+   * fit_paper_height). It never scrolls inside: a scrolled textarea shows
+   * half rows */
+  height: calc(var(--cell) * 6);
+  min-height: calc(var(--cell) * 6);
+  overflow: hidden;
   margin: 0;
   padding: 0 0 0 calc((var(--cell) - var(--glyph)) / 2);
-  resize: vertical;
+  resize: none;
   border: 0;
   border-radius: 0;
   outline: 3px double var(--grid);

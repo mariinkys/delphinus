@@ -10,7 +10,7 @@ use crate::{
     },
     model::{CardFormat, Lang, MAX_TERMS, split_terms, to_full_width},
 };
-use leptos::{prelude::*, server_fn::error::ServerFnError, task::spawn_local};
+use leptos::{ev, html, prelude::*, server_fn::error::ServerFnError, task::spawn_local};
 use leptos_meta::Title;
 use wasm_bindgen::JsCast;
 
@@ -42,7 +42,39 @@ fn fit_to_grid(el: &web_sys::HtmlTextAreaElement) -> String {
             let _ = el.set_selection_range(s.saturating_sub(shrink), e.saturating_sub(shrink));
         }
     }
-    wide.to_string()
+    wide
+}
+
+/// Sizes the word box to whole grid rows that fit its text, plus one empty
+/// row to write on (at least six). The box never scrolls inside, so the text
+/// cannot drift off the grid; the page scrolls instead
+fn fit_paper_height(el: &web_sys::HtmlTextAreaElement) {
+    let Some(window) = web_sys::window() else {
+        return;
+    };
+    // One grid row = the line height (46px, or 40px on phones)
+    let row = window
+        .get_computed_style(el)
+        .ok()
+        .flatten()
+        .and_then(|cs| cs.get_property_value("line-height").ok())
+        .and_then(|v| v.trim_end_matches("px").parse::<f64>().ok())
+        .filter(|v| *v > 0.0)
+        .unwrap_or(46.0);
+    // Collapsing the box to measure its content shortens the page for a
+    // moment; keep the page where it was so it doesn't jump while typing
+    let (x, y) = (
+        window.scroll_x().unwrap_or(0.0),
+        window.scroll_y().unwrap_or(0.0),
+    );
+    let style = web_sys::HtmlElement::style(el);
+    // The stylesheet's six-row minimum is only for before this runs; it
+    // would stop the box collapsing to be measured
+    let _ = style.set_property("min-height", "0px");
+    let _ = style.set_property("height", "0px");
+    let rows = ((el.scroll_height() as f64 / row).ceil() as i32 + 1).max(6);
+    let _ = style.set_property("height", &format!("{}px", rows as f64 * row));
+    window.scroll_to_with_x_and_y(x, y);
 }
 
 fn error_text(e: ServerFnError) -> String {
@@ -65,6 +97,24 @@ pub fn Workspace() -> impl IntoView {
     let busy = RwSignal::new(false);
     let scanning = RwSignal::new(false);
     let terms = Memo::new(move |_| split_terms(&input.read()));
+    let paper = NodeRef::<html::Textarea>::new();
+
+    // Re-fit the paper whenever its text changes (typing, pasting, scanning,
+    // restoring) or the window width changes (lines re-wrap). The next frame
+    // is used so the new text is already in the box when it is measured
+    let refit = move || {
+        request_animation_frame(move || {
+            if let Some(el) = paper.get_untracked() {
+                fit_paper_height(&el);
+            }
+        })
+    };
+    Effect::new(move |_| {
+        input.track();
+        refit();
+    });
+    let resize = window_event_listener(ev::resize, move |_| refit());
+    on_cleanup(move || resize.remove());
 
     // Restore the last session in this browser, then keep it saved
     Effect::new(move |_| {
@@ -183,6 +233,8 @@ pub fn Workspace() -> impl IntoView {
                 <textarea
                     id="words"
                     class="paper"
+                    node_ref=paper
+                    rows="6"
                     lang=move || lang.get().code()
                     spellcheck="false"
                     autocomplete="off"
@@ -190,7 +242,7 @@ pub fn Workspace() -> impl IntoView {
                     prop:value=input
                     on:input=move |ev| {
                         // Leave the text alone while an IME is composing
-                        // (romaji typed for kana); compositionend handles it
+                        // (romaji typed for kana); compositionend handles it.
                         if ev.dyn_ref::<web_sys::InputEvent>().is_some_and(|e| e.is_composing()) {
                             input.set(event_target_value(&ev));
                         } else {
